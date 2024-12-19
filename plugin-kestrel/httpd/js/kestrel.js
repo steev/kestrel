@@ -50,7 +50,7 @@ kismet_ui_tabpane.AddTab(
         };
 
         //Instantiate map
-        mapInstance = L.map("kestrel").setView([38.80935, -77.05004], 15);
+        mapInstance = L.map("kestrel").setView([0.0, 0.0], 3);
         mapTileLayer = L.tileLayer(
           "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
           {
@@ -97,7 +97,6 @@ kismet_ui_tabpane.AddTab(
             return null;
           },
           draw: function (canvas, width, height) {
-            var lol = 0;
             var start = 0;
             for (var i = 0, l = colors.length; i < l; ++i) {
               var size = this.stats[i] / this.population;
@@ -130,11 +129,21 @@ kismet_ui_tabpane.AddTab(
           },
         });
         var macs = [];
-        var drivepath = [];
-        getOldDevs();
-        $(window).ready(function () {
-          setInterval(addDevs, 1000);
-        });
+
+        // Create empty polyline, locations will be added/plotted as GPS updates
+        // var drivePath = L.polyline([], {
+        //   color: "blue",
+        //   smoothFactor: 1,
+        // });
+        // drivePath.addTo(mapInstance);
+
+        // Prevent duplicate locations in the drivePath polyline (reduce risk of high cpu/mem usage)
+        // var previousLocation = [0, 0];
+        // var mapFitBound = false;
+
+        // Create vehicle marker, stage at 0,0 until GPS updates
+        // var driveMarker = L.marker([0, 0]);
+        // driveMarker.addTo(mapInstance);
 
         // Event called when Leaflet thinks all visible tiles are loaded
         // Invalidating the size ensures half-visible tiles (grayed areas) are loaded
@@ -146,33 +155,46 @@ kismet_ui_tabpane.AddTab(
           mapInstance.invalidateSize();
         });
 
-        /**$(window).ready( function() {
-     setInterval(getCurrentLocation, 1000);
-   });**/
+        // Retrieve all devices once
+        getOldDevs();
 
-        function getCurrentLocation() {
-          $.getJSON("/gps/location.json").done(function (loc) {
-            var lat = loc["kismet.common.location.lat"];
-            var lon = loc["kismet.common.location.lon"];
-            var alt = loc["kismet.common.location.alt"];
-            var speed = loc["kismet.common.location.speed"];
-            var heading = loc["kismet.common.location.heading"];
-            var fix = loc["kismet.common.location.fix"];
-            var locval = loc["kismet.common.location.valid"];
-            var loctime = loc["kismet.common.location.time_sec"];
-            var loctimeu = loc["kismet.common.location.time_usec"];
-            var gpsuuid = loc["kismet.common.location.gps_uuid"];
-            var newloc = [lat, lon];
-            drivepath.push(newloc);
-            var mappath = L.polyline(drivepath, {
-              color: "blue",
-              smoothFactor: 1,
-            });
-            mapInstance.removeLayer(mappath);
-            mapInstance.fitBounds(mappath.getBounds());
-            mappath.addTo(mapInstance);
-          });
-        }
+        // Schedule periodic updates
+        setInterval(addDevs, 1000);
+
+        // Update drive path (once)
+        // updateDrivePath();
+
+        // function updateDrivePath() {
+        //   $.get("/gps/location.json").done(function (data) {
+        //     console.log(data);
+        //     var currentLocation = [
+        //       data["kismet.common.location.geopoint"][1],
+        //       data["kismet.common.location.geopoint"][0],
+        //     ];
+        //     // console.log("currentLocation: " + currentLocation);
+        //     // console.log("previousLocation: " + previousLocation);
+        //     if (
+        //       !currentLocation ||
+        //       (!currentLocation[0] && !currentLocation[1]) ||
+        //       (currentLocation[0] == previousLocation[0] &&
+        //         currentLocation[1] == previousLocation[1])
+        //     ) {
+        //       // console.log("Skipped invalid or previous location");
+        //       return true;
+        //     } else {
+        //       // console.log("New location: " + currentLocation)
+        //       drivePath.addLatLng(currentLocation);
+        //       driveMarker.setLatLng(currentLocation);
+        //       previousLocation = currentLocation;
+        //       if (!mapFitBound) {
+        //         // console.log("Fitting drive path within map bounds.")
+        //         mapInstance.setView(driveMarker.getLatLng());
+        //         mapInstance.fitBounds(drivePath.getBounds());
+        //         mapFitBound = true;
+        //       }
+        //     }
+        //   });
+        // }
 
         function getOldDevs() {
           $.ajax({
@@ -191,6 +213,10 @@ kismet_ui_tabpane.AddTab(
               var manuf = "";
               var lat = "";
               var lon = "";
+              var min_lat = 0.0;
+              var min_lon = 0.0;
+              var max_lat = 0.0;
+              var max_lon = 0.0;
               for (var x = 0; x < devs.length; x++) {
                 ssid = devs[x]["kismet.device.base.name"];
                 type = devs[x]["kismet.device.base.type"];
@@ -213,6 +239,10 @@ kismet_ui_tabpane.AddTab(
                     devs[x]["kismet.device.base.location"][
                       "kismet.common.location.avg_loc"
                     ]["kismet.common.location.geopoint"][0];
+                  if (lat < min_lat) min_lat = lat;
+                  if (lon < min_lon) min_lon = lon;
+                  if (lat > max_lat) max_lat = lat;
+                  if (lon > max_lon) max_lon = lon;
                 } else {
                   lat = 0.0;
                   lon = 0.0;
@@ -228,6 +258,11 @@ kismet_ui_tabpane.AddTab(
                 };
                 macs.push(device);
               } // end of for
+
+              mapInstance.fitBounds([
+                [min_lat, min_lon],
+                [max_lat, max_lon],
+              ]);
             }, //end of success
           }); // end of ajax
         } //end of getdevs
