@@ -3,37 +3,42 @@
 // Git: github.com/soliforte
 // Freeware, enjoy. If you do something really cool with it, let me know. Pull requests encouraged
 
-var mymap;
+var mapInstance;
 var mapTileLayer;
 
 kismet_ui_tabpane.AddTab(
   {
-    id: "mapid",
+    id: "kestrel",
     tabTitle: "Kestrel",
     priority: -1,
     createCallback: function (div) {
       $(document).ready(function () {
         $(div).append(
+          '<link rel="stylesheet" href="/plugin/kestrel/css/leaflet.css">'
+        );
+        $(div).append(
+          '<link rel="stylesheet" href="/plugin/kestrel/css/leafletKestrel.css">'
+        );
+        $(div).append(
+          '<link rel="stylesheet" href="/plugin/kestrel/css/leaflet.mousecoordinate.css">'
+        );
+        $(div).append(
           '<script src="/plugin/kestrel/js/underscore-min.js"></script>'
-        );
-        $(div).append(
-          '<link rel="stylesheet" href="/plugin/kestrel/leaflet.css">'
-        );
-        $(div).append('<script src="/plugin/kestrel/js/leaflet.js"></script>');
-        $(div).append(
-          '<link rel="stylesheet" href="/plugin/kestrel/LeafletStyleSheet.css">'
         );
         $(div).append(
           '<script src="/plugin/kestrel/js/PruneCluster.js"></script>'
         );
+        // Uncomment additional formats to use with leaflet.mouseCoordinate
+        // Ref: https://github.com/wattnpapa/leaflet.mouseCoordinate
+        // $(div).append('<script src="/plugin/kestrel/js/nac.js"></script>');
+        // $(div).append('<script src="/plugin/kestrel/js/qth.js"></script>');
+        // $(div).append('<script src="/plugin/kestrel/js/utm.js"></script>');
+        // $(div).append('<script src="/plugin/kestrel/js/utmref.js"></script>');
+        $(div).append('<script src="/plugin/kestrel/js/leaflet.js"></script>');
         $(div).append(
-          '<script src="/plugin/kestrel/js/leaflet.mouseCoordinate.js">'
+          '<script src="/plugin/kestrel/js/leaflet.mousecoordinate.min.js">'
         );
-        $(div).append(
-          '<link rel="stylesheet" href="/plugin/kestrel/js/leaflet.mouseCoordinate.css">'
-        );
-        //$(div).append('<style> #controls { position: absolute; border: 1px, solid; top: 10px; left: 10px; z-index: 99; }</style>')
-        //$(div).append('<div id="controls"></div>'
+
         //Instantiate cluster for le clustering of devices
         var dataCluster = new PruneClusterForLeaflet();
         //Build custom ClusterIcon
@@ -45,7 +50,7 @@ kismet_ui_tabpane.AddTab(
         };
 
         //Instantiate map
-        mymap = L.map("mapid").setView([38.80935, -77.05004], 15);
+        mapInstance = L.map("kestrel").setView([38.80935, -77.05004], 15);
         mapTileLayer = L.tileLayer(
           "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
           {
@@ -53,24 +58,25 @@ kismet_ui_tabpane.AddTab(
             attribution:
               '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           }
-        ).addTo(mymap);
+        ).addTo(mapInstance);
 
-        //Probably removing this. Gets current location via browser API
-        $(window).ready(function () {
-          mymap.locate({ setView: true, maxZoom: 15 });
-        });
+        // Additional options on leaflet.mouseCoordinate's GitHub
+        // Ref: https://github.com/wattnpapa/leaflet.mouseCoordinate
+        L.control
+          .mouseCoordinate({ gps: true, gpsLong: false })
+          .addTo(mapInstance);
 
         var colors = [
-            "#ff4b00",
-            "#bac900",
-            "#EC1813",
-            "#55BCBE",
-            "#D2204C",
-            "#FF0000",
-            "#ada59a",
-            "#3e647e",
-          ],
-          pi2 = Math.PI * 2;
+          "#ff4b00",
+          "#bac900",
+          "#EC1813",
+          "#55BCBE",
+          "#D2204C",
+          "#FF0000",
+          "#ada59a",
+          "#3e647e",
+        ];
+        var pi2 = Math.PI * 2;
 
         L.Icon.MarkerCluster = L.Icon.extend({
           options: {
@@ -133,11 +139,11 @@ kismet_ui_tabpane.AddTab(
         // Event called when Leaflet thinks all visible tiles are loaded
         // Invalidating the size ensures half-visible tiles (grayed areas) are loaded
         mapTileLayer.on("load", function () {
-          mymap.invalidateSize();
+          mapInstance.invalidateSize();
         });
 
         $("#centerpane-tabs").on("resize", function () {
-          mymap.invalidateSize();
+          mapInstance.invalidateSize();
         });
 
         /**$(window).ready( function() {
@@ -162,9 +168,9 @@ kismet_ui_tabpane.AddTab(
               color: "blue",
               smoothFactor: 1,
             });
-            mymap.removeLayer(mappath);
-            mymap.fitBounds(mappath.getBounds());
-            mappath.addTo(mymap);
+            mapInstance.removeLayer(mappath);
+            mapInstance.fitBounds(mappath.getBounds());
+            mappath.addTo(mapInstance);
           });
         }
 
@@ -329,7 +335,7 @@ kismet_ui_tabpane.AddTab(
           }
           dataCluster.ProcessView();
           var latlon = _.last(uniqmacs);
-          mymap.addLayer(dataCluster); // Temporarily disabled locking-to-location until I figure a way to make it toggle-able. you can re-enable by adding .setView([latlon['LAT'],latlon['LON']], 16) to the end of this line
+          mapInstance.addLayer(dataCluster); // Temporarily disabled locking-to-location until I figure a way to make it toggle-able. you can re-enable by adding .setView([latlon['LAT'],latlon['LON']], 16) to the end of this line
           macs = uniqmacs;
           //$.cookie("storedmacs", JSON.stringify(macs));
         }
@@ -397,7 +403,7 @@ kismet_ui_tabpane.AddTab(
     }, //end of createCallback
     activateCallback: function () {
       $(document).ready(function () {
-        mymap.invalidateSize();
+        mapInstance.invalidateSize();
       });
     },
   },
