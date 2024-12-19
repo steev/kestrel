@@ -3,9 +3,13 @@
 // Git: github.com/soliforte
 // Freeware, enjoy. If you do something really cool with it, let me know. Pull requests encouraged
 
+var mymap;
+var mapTileLayer;
+
 kismet_ui_tabpane.AddTab({
 	id:    'mapid',
-	tabTitle:    'Maps',
+	tabTitle:    'Kestrel',
+	priority:    -1,
 	createCallback: function(div) {
     $(document).ready( function() {
 
@@ -31,11 +35,12 @@ kismet_ui_tabpane.AddTab({
       };
 
       //Instantiate map
-      var mymap = L.map('mapid').setView([38.80935, -77.05004], 15);
-            L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            }).addTo(mymap);
+      mymap = L.map('mapid').setView([38.80935, -77.05004], 15);
+      mapTileLayer = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 19,
+              attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(mymap);
+
       //Probably removing this. Gets current location via browser API
       $( window ).ready( function(){
           mymap.locate({setView: true, maxZoom: 15});
@@ -102,6 +107,16 @@ kismet_ui_tabpane.AddTab({
      setInterval(addDevs, 1000);
     });
 
+    // Event called when Leaflet thinks all visible tiles are loaded
+    // Invalidating the size ensures half-visible tiles (grayed areas) are loaded
+    mapTileLayer.on('load', function () {
+      mymap.invalidateSize();
+    });
+
+    $('#centerpane-tabs').on('resize', function() {
+      mymap.invalidateSize();
+    });
+
     /**$(window).ready( function() {
      setInterval(getCurrentLocation, 1000);
    });**/
@@ -133,6 +148,10 @@ kismet_ui_tabpane.AddTab({
         dataType: 'json',
         timeout: 30000,
         success: function(devs) {
+          if (!Array.isArray(devs)) {
+            return;
+          }
+
           var ssid = ""
           var type = ""
           var mac = ""
@@ -168,7 +187,8 @@ kismet_ui_tabpane.AddTab({
       getDevs();
       var uniqmacs = _.uniq(macs, 'MAC');
       dataCluster.RemoveMarkers();
-      var search = document.getElementById("device_search").value;
+      // var search = document.getElementById("device_search").value;
+      var search = '';
       for ( var i in uniqmacs){
         var marker = new PruneCluster.Marker(uniqmacs[i]['LAT'], uniqmacs[i]['LON']);
         marker.data.id = uniqmacs[i]['MAC'];
@@ -296,6 +316,10 @@ kismet_ui_tabpane.AddTab({
       }); // end of ajax
     }; //end of getdevs
     }); //end of document.ready
-  }, //end of function(div)
-   priority:    -998,
- }); //End of createCallback
+  }, //end of createCallback
+  activateCallback: function() { 
+    $(document).ready( function() {
+      mymap.invalidateSize();
+    });
+  },
+ }, 'center'); //End of createCallback
