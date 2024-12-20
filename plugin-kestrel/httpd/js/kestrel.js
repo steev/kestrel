@@ -23,6 +23,9 @@ kismet_ui_tabpane.AddTab(
           '<link rel="stylesheet" href="/plugin/kestrel/css/leaflet.mousecoordinate.css">'
         );
         $(div).append(
+          '<link rel="stylesheet" href="/plugin/kestrel/css/L.Control.ResetView.min.css">'
+        );
+        $(div).append(
           '<script src="/plugin/kestrel/js/underscore-min.js"></script>'
         );
         $(div).append(
@@ -38,6 +41,9 @@ kismet_ui_tabpane.AddTab(
         $(div).append(
           '<script src="/plugin/kestrel/js/leaflet.mousecoordinate.min.js">'
         );
+        $(div).append(
+          '<script src="/plugin/kestrel/js/L.Control.ResetView.min.js"></script>'
+        );
 
         //Instantiate cluster for le clustering of devices
         var dataCluster = new PruneClusterForLeaflet();
@@ -50,7 +56,7 @@ kismet_ui_tabpane.AddTab(
         };
 
         //Instantiate map
-        mapInstance = L.map("kestrel").setView([0.0, 0.0], 3);
+        mapInstance = L.map("kestrel").setView([0.0, 0.0], 1);
         mapTileLayer = L.tileLayer(
           "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
           {
@@ -65,6 +71,14 @@ kismet_ui_tabpane.AddTab(
         L.control
           .mouseCoordinate({ gps: true, gpsLong: false })
           .addTo(mapInstance);
+
+        // Reset view button
+        L.control.resetView({
+          position: "topleft",
+          title: "Reset view",
+          latlng: L.latLng([0.0, -0.0]),
+          zoom: 1,
+        }).addTo(mapInstance);
 
         var colors = [
           "#ff4b00",
