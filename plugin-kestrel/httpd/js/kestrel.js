@@ -3,6 +3,23 @@
 // Git: github.com/soliforte
 // Freeware, enjoy. If you do something really cool with it, let me know. Pull requests encouraged
 
+// Refresh interval in milliseconds
+// Default: 1000 (1sec)
+const REFRESH_INTERVAL = 1000;
+
+// Initial location (format: DD.DDDDDD, DD.DDDDDD)
+// Default: [0.0, 0.0]
+const INITIAL_LATLON = [0.0, 0.0];
+
+let kestrelRefreshInterval = kismet.getStorage(
+  "kismet.kestrel.refresh_interval",
+  REFRESH_INTERVAL
+);
+let kestrelIntialLatLon = kismet.getStorage(
+  "kismet.kestrel.initial_latlon",
+  INITIAL_LATLON
+);
+
 var mapInstance;
 var mapTileLayer;
 
@@ -56,7 +73,7 @@ kismet_ui_tabpane.AddTab(
         };
 
         //Instantiate map
-        mapInstance = L.map("kestrel").setView([0.0, 0.0], 1);
+        mapInstance = L.map("kestrel").setView(kestrelIntialLatLon, 1);
         mapTileLayer = L.tileLayer(
           "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
           {
@@ -73,12 +90,14 @@ kismet_ui_tabpane.AddTab(
           .addTo(mapInstance);
 
         // Reset view button
-        L.control.resetView({
-          position: "topleft",
-          title: "Reset view",
-          latlng: L.latLng([0.0, -0.0]),
-          zoom: 1,
-        }).addTo(mapInstance);
+        L.control
+          .resetView({
+            position: "topleft",
+            title: "Reset view",
+            latlng: L.latLng(kestrelIntialLatLon),
+            zoom: 1,
+          })
+          .addTo(mapInstance);
 
         var colors = [
           "#ff4b00",
@@ -173,7 +192,7 @@ kismet_ui_tabpane.AddTab(
         getOldDevs();
 
         // Schedule periodic updates
-        setInterval(addDevs, 1000);
+        setInterval(addDevs, kestrelRefreshInterval);
 
         // Update drive path (once)
         // updateDrivePath();
@@ -458,3 +477,85 @@ kismet_ui_tabpane.AddTab(
   },
   "center"
 ); //End of createCallback
+
+kismet_ui_settings.AddSettingsPane({
+  id: "kestrel_settings",
+  listTitle: "Kestrel",
+  create: function (elem) {
+    elem.append(
+      $("<form>", {
+        id: "form",
+      })
+        .append(
+          $("<fieldset>", {
+            id: "kestrel_general",
+          })
+            .append($("<legend>", {}).html("General"))
+            .append(
+              $("<label>", {
+                for: "kestrel_initial_latlon",
+              }).html(
+                "Initial location to zoom in on when map initially loads (format DD.DDDDDD, DD.DDDDDD): "
+              )
+            )
+            .append(
+              $("<input>", {
+                type: "text",
+                name: "kestrel_initial_latlon",
+                id: "kestrel_initial_latlon",
+              })
+            )
+            .append($("<br>", {}))
+            .append(
+              $("<label>", {
+                for: "kestrel_refresh_interval",
+              }).html(
+                "Interval between map data updates (in miliseconds, 1s = 1000ms): "
+              )
+            )
+            .append(
+              $("<input>", {
+                type: "text",
+                name: "kestrel_refresh_interval",
+                id: "kestrel_refresh_interval",
+              })
+            )
+        )
+        .append($("<br>", {}))
+        .append(
+          $("<p>").html(
+            "Note: Refresh the Kismet Web UI for changes to take effect."
+          )
+        )
+    );
+
+    $("#form", elem).on("change", function () {
+      kismet_ui_settings.SettingsModified();
+    });
+
+    $("#kestrel_initial_latlon").val(
+      kismet.getStorage("kismet.kestrel.initial_latlon", INITIAL_LATLON)
+    );
+
+    $("#kestrel_refresh_interval").val(
+      kismet.getStorage("kismet.kestrel.refresh_interval", REFRESH_INTERVAL)
+    );
+
+    $("#kismet_general", elem).controlgroup();
+  },
+  save: function (elem) {
+    let initial_latlon = $("input[name='kestrel_initial_latlon']", elem).val();
+    kismet.putStorage(
+      "kismet.kestrel.initial_latlon",
+      initial_latlon.split(",")
+    );
+
+    let refresh_interval = $(
+      "input[name='kestrel_refresh_interval']",
+      elem
+    ).val();
+    kismet.putStorage("kismet.kestrel.refresh_interval", refresh_interval);
+
+    return true;
+  },
+}); // end AddSettingsPane
