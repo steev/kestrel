@@ -34,14 +34,15 @@ const kismetFields = {
     "kismet.device.base.macaddr",
     "kismet.device.base.manuf",
     "kismet.device.base.last_time",
-    // [
-    //   "kismet.device.base.location/kismet.common.location.avg_loc/kismet.common.location.geopoint",
-    //   "location",
-    // ],
     [
       "kismet.device.base.signal/kismet.common.signal.last_signal",
       "last_signal",
     ],
+    // @todo Add a setting to switch between average/first/last location (same for signal?)
+    // [
+    //   "kismet.device.base.location/kismet.common.location.avg_loc/kismet.common.location.geopoint",
+    //   "location",
+    // ],
     [
       "kismet.device.base.location/kismet.common.location.last/kismet.common.location.geopoint",
       "location",
@@ -294,7 +295,6 @@ kismet_ui_tabpane.AddTab(
 
           $.ajax({
             type: "POST",
-            async: false,
             url: url,
             data: postKismetFields,
             success: plotDevices,
@@ -304,8 +304,6 @@ kismet_ui_tabpane.AddTab(
 
         function plotDevices(response) {
           let devices = kismet.sanitizeObject(response);
-
-          // clusterLayer.RemoveMarkers();
 
           for (const d of devices) {
             if (markers.has(d["kismet.device.base.key"])) {
@@ -333,7 +331,6 @@ kismet_ui_tabpane.AddTab(
             }
           }
 
-          // clusterLayer.RegisterMarkers(markers.values());
           clusterLayer.ProcessView();
 
           $(".kestrelDetailsBtn").on("click", function () {
@@ -348,6 +345,7 @@ kismet_ui_tabpane.AddTab(
 
           clusterLayer.FitBounds();
 
+          // @todo Add a button to set a new reset location/zoom
           L.control
             .resetView({
               position: "topleft",
