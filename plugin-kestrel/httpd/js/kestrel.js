@@ -12,6 +12,7 @@ const REFRESH_INTERVAL = 1000;
 const INITIAL_LATLON = [0.0, 0.0];
 
 // Colors used for the cluster donuts
+// @todo Add color settings
 const COLORS = [
   "#ff4b00",
   "#bac900",
@@ -144,7 +145,7 @@ kismet_ui_tabpane.AddTab(
                 iconUrl: "/plugin/kestrel/images/ic_leak_add_black_24dp_1x.png",
                 iconSize: [24, 24],
               });
-              marker.category = 3;
+              marker.category = 4;
               marker.weight = 1;
               break;
             case "Wi-Fi Ad-Hoc":
@@ -153,7 +154,7 @@ kismet_ui_tabpane.AddTab(
                   "/plugin/kestrel/images/ic_cast_connected_black_24dp_1x.png",
                 iconSize: [24, 24],
               });
-              marker.category = 3;
+              marker.category = 5;
               marker.weight = 1;
               break;
             case "Wi-Fi Device":
@@ -162,7 +163,7 @@ kismet_ui_tabpane.AddTab(
                   "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png",
                 iconSize: [24, 24],
               });
-              marker.category = 3;
+              marker.category = 6;
               marker.weight = 1;
               break;
             case "":
@@ -171,7 +172,7 @@ kismet_ui_tabpane.AddTab(
                   "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png",
                 iconSize: [24, 24],
               });
-              marker.category = 3;
+              marker.category = 7;
               marker.weight = 1;
               break;
             default:
@@ -180,7 +181,7 @@ kismet_ui_tabpane.AddTab(
                   "/plugin/kestrel/images/ic_bluetooth_black_24dp_1x.png",
                 iconSize: [24, 24],
               });
-              marker.category = 5;
+              marker.category = 8;
               marker.weight = 1;
               break;
           }
@@ -208,15 +209,17 @@ kismet_ui_tabpane.AddTab(
             return null;
           },
           draw: function (canvas, width, height) {
+            // Pie slices
             let start = 0;
-            for (let i = 0, l = COLORS.length; i < l; ++i) {
+            console.log(this.stats);
+            for (let i = 0; i < COLORS.length; ++i) {
               let size = this.stats[i] / this.population;
               if (size > 0) {
                 canvas.beginPath();
                 canvas.moveTo(22, 22);
                 canvas.fillStyle = COLORS[i];
-                let from = start + 0.14,
-                  to = start + size * PI2;
+                let from = start + 0.14; // Add empty space between slices
+                let to = start + size * PI2;
                 if (to < from) {
                   from = start;
                 }
@@ -227,11 +230,13 @@ kismet_ui_tabpane.AddTab(
                 canvas.closePath();
               }
             }
+            // Donut hole background
             canvas.beginPath();
             canvas.fillStyle = "white";
             canvas.arc(22, 22, 18, 0, PI2);
             canvas.fill();
             canvas.closePath();
+            // Donut hole text (count)
             canvas.fillStyle = "#555";
             canvas.textAlign = "center";
             canvas.textBaseline = "middle";
