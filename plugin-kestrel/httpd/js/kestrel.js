@@ -12,7 +12,7 @@ const REFRESH_INTERVAL = 1000;
 const INITIAL_LATLON = [0.0, 0.0];
 
 // Colors used for the cluster donuts
-const colors = [
+const COLORS = [
   "#ff4b00",
   "#bac900",
   "#EC1813",
@@ -24,9 +24,9 @@ const colors = [
 ];
 
 // Simple way to do the math once
-const pi2 = Math.PI * 2;
+const PI2 = Math.PI * 2;
 
-const kismetFields = {
+const KISMET_FIELDS = {
   fields: [
     "kismet.device.base.key",
     "kismet.device.base.type",
@@ -49,7 +49,7 @@ const kismetFields = {
     ],
   ],
 };
-const postKismetFields = "json=" + JSON.stringify(kismetFields);
+const KISMET_FIELDS_QUERY = "json=" + JSON.stringify(KISMET_FIELDS);
 
 let kestrelRefreshInterval = kismet.getStorage(
   "kismet.kestrel.refresh_interval",
@@ -209,19 +209,19 @@ kismet_ui_tabpane.AddTab(
           },
           draw: function (canvas, width, height) {
             let start = 0;
-            for (let i = 0, l = colors.length; i < l; ++i) {
+            for (let i = 0, l = COLORS.length; i < l; ++i) {
               let size = this.stats[i] / this.population;
               if (size > 0) {
                 canvas.beginPath();
                 canvas.moveTo(22, 22);
-                canvas.fillStyle = colors[i];
+                canvas.fillStyle = COLORS[i];
                 let from = start + 0.14,
-                  to = start + size * pi2;
+                  to = start + size * PI2;
                 if (to < from) {
                   from = start;
                 }
                 canvas.arc(22, 22, 22, from, to);
-                start = start + size * pi2;
+                start = start + size * PI2;
                 canvas.lineTo(22, 22);
                 canvas.fill();
                 canvas.closePath();
@@ -229,7 +229,7 @@ kismet_ui_tabpane.AddTab(
             }
             canvas.beginPath();
             canvas.fillStyle = "white";
-            canvas.arc(22, 22, 18, 0, pi2);
+            canvas.arc(22, 22, 18, 0, PI2);
             canvas.fill();
             canvas.closePath();
             canvas.fillStyle = "#555";
@@ -296,7 +296,7 @@ kismet_ui_tabpane.AddTab(
           $.ajax({
             type: "POST",
             url: url,
-            data: postKismetFields,
+            data: KISMET_FIELDS_QUERY,
             success: plotDevices,
             dataType: "json",
           });
