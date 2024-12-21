@@ -313,12 +313,14 @@ kismet_ui_tabpane.AddTab(
             } else {
               let marker = createDeviceMarker(d);
 
-              marker.data.popup = `MAC: ${d["kismet.device.base.macaddr"]}<br>
-              SSID: ${d["kismet.device.base.name"]}<br>
-              Type: ${d["kismet.device.base.type"]}<br>
-              RSSI: ${d["last_signal"]}<br>
-              Coords: ${d["location"][1]}, ${d["location"][0]}<br>
-              <br>
+              marker.data.popup = `<table>
+              <tr><th>MAC</th><td>${d["kismet.device.base.macaddr"]}</td></tr>
+              <tr><th>SSID</th><td>${d["kismet.device.base.name"]}</td></tr>
+              <tr><th>Type</th><td>${d["kismet.device.base.type"]}</td></tr>
+              <tr><th>Manuf</th><td>${d["kismet.device.base.manuf"]}</td></tr>
+              <tr><th>RSSI</th><td>${d["last_signal"]}</td></tr>
+              <tr><th>Coords</th><td>${d["location"][1]}, ${d["location"][0]}</td></tr>
+              </table>
               <button type="button" class="kestrelDetailsBtn" value="${d["kismet.device.base.key"]}">Device Details</a>`;
 
               markers.set(d["kismet.device.base.key"], marker);
