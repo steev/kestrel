@@ -78,7 +78,7 @@ kismet_ui_tabpane.AddTab(
           '<link rel="stylesheet" href="/plugin/kestrel/css/leaflet.css">'
         );
         $(div).append(
-          '<link rel="stylesheet" href="/plugin/kestrel/css/leafletKestrel.css">'
+          '<link rel="stylesheet" href="/plugin/kestrel/css/kestrel.css">'
         );
         $(div).append(
           '<link rel="stylesheet" href="/plugin/kestrel/css/leaflet.mousecoordinate.css">'
