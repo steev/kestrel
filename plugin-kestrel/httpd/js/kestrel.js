@@ -11,17 +11,60 @@ const REFRESH_INTERVAL = 1000;
 // Default: [0.0, 0.0]
 const INITIAL_LATLON = [0.0, 0.0];
 
+// Colors used for the cluster donuts
+const colors = [
+  "#ff4b00",
+  "#bac900",
+  "#EC1813",
+  "#55BCBE",
+  "#D2204C",
+  "#FF0000",
+  "#ada59a",
+  "#3e647e",
+];
+
+// Simple way to do the math once
+const pi2 = Math.PI * 2;
+
+const kismetFields = {
+  fields: [
+    "kismet.device.base.key",
+    "kismet.device.base.type",
+    "kismet.device.base.name",
+    "kismet.device.base.macaddr",
+    "kismet.device.base.manuf",
+    "kismet.device.base.last_time",
+    // [
+    //   "kismet.device.base.location/kismet.common.location.avg_loc/kismet.common.location.geopoint",
+    //   "location",
+    // ],
+    [
+      "kismet.device.base.signal/kismet.common.signal.last_signal",
+      "last_signal",
+    ],
+    [
+      "kismet.device.base.location/kismet.common.location.last/kismet.common.location.geopoint",
+      "location",
+    ],
+  ],
+};
+const postKismetFields = "json=" + JSON.stringify(kismetFields);
+
 let kestrelRefreshInterval = kismet.getStorage(
   "kismet.kestrel.refresh_interval",
   REFRESH_INTERVAL
 );
-let kestrelIntialLatLon = kismet.getStorage(
+let kestrelInitialLatLon = kismet.getStorage(
   "kismet.kestrel.initial_latlon",
   INITIAL_LATLON
 );
 
-var mapInstance;
-var mapTileLayer;
+let kestrel_initial_timeframe = 1;
+
+let markers = new Map();
+let mapInstance;
+let mapTileLayer;
+let isActiveTab = false;
 
 kismet_ui_tabpane.AddTab(
   {
@@ -62,55 +105,89 @@ kismet_ui_tabpane.AddTab(
           '<script src="/plugin/kestrel/js/L.Control.ResetView.min.js"></script>'
         );
 
-        //Instantiate cluster for le clustering of devices
-        var dataCluster = new PruneClusterForLeaflet();
-        //Build custom ClusterIcon
-        dataCluster.BuildLeafletClusterIcon = function (cluster) {
-          var e = new L.Icon.MarkerCluster();
-          e.stats = cluster.stats;
-          e.population = cluster.population;
-          return e;
-        };
+        function createDeviceMarker(d) {
+          let marker = new PruneCluster.Marker(
+            d["location"][1],
+            d["location"][0]
+          );
 
-        //Instantiate map
-        mapInstance = L.map("kestrel").setView(kestrelIntialLatLon, 1);
-        mapTileLayer = L.tileLayer(
-          "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          {
-            maxZoom: 19,
-            attribution:
-              '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          switch (d["kismet.device.base.type"]) {
+            case "Wi-Fi AP":
+              marker.data.icon = L.icon({
+                iconUrl: "/plugin/kestrel/images/ic_router_black_24dp_1x.png",
+                iconSize: [24, 24],
+              });
+              marker.category = 1;
+              marker.weight = 1;
+              break;
+            case "Wi-Fi Client":
+              marker.data.icon = L.icon({
+                iconUrl:
+                  "/plugin/kestrel/images/ic_laptop_chromebook_black_24dp_1x.png",
+                iconSize: [24, 24],
+              });
+              marker.category = 2;
+              marker.weight = 1;
+              break;
+            case "Wi-Fi Bridged":
+              marker.data.icon = L.icon({
+                iconUrl:
+                  "/plugin/kestrel/images/ic_power_input_black_24dp_1x.png",
+                iconSize: [24, 24],
+              });
+              marker.category = 3;
+              marker.weight = 1;
+              break;
+            case "Wi-Fi WDS":
+              marker.data.icon = L.icon({
+                iconUrl: "/plugin/kestrel/images/ic_leak_add_black_24dp_1x.png",
+                iconSize: [24, 24],
+              });
+              marker.category = 3;
+              marker.weight = 1;
+              break;
+            case "Wi-Fi Ad-Hoc":
+              marker.data.icon = L.icon({
+                iconUrl:
+                  "/plugin/kestrel/images/ic_cast_connected_black_24dp_1x.png",
+                iconSize: [24, 24],
+              });
+              marker.category = 3;
+              marker.weight = 1;
+              break;
+            case "Wi-Fi Device":
+              marker.data.icon = L.icon({
+                iconUrl:
+                  "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png",
+                iconSize: [24, 24],
+              });
+              marker.category = 3;
+              marker.weight = 1;
+              break;
+            case "":
+              marker.data.icon = L.icon({
+                iconUrl:
+                  "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png",
+                iconSize: [24, 24],
+              });
+              marker.category = 3;
+              marker.weight = 1;
+              break;
+            default:
+              marker.data.icon = L.icon({
+                iconUrl:
+                  "/plugin/kestrel/images/ic_bluetooth_black_24dp_1x.png",
+                iconSize: [24, 24],
+              });
+              marker.category = 5;
+              marker.weight = 1;
+              break;
           }
-        ).addTo(mapInstance);
 
-        // Additional options on leaflet.mouseCoordinate's GitHub
-        // Ref: https://github.com/wattnpapa/leaflet.mouseCoordinate
-        L.control
-          .mouseCoordinate({ gps: true, gpsLong: false })
-          .addTo(mapInstance);
+          return marker;
+        }
 
-        // Reset view button
-        L.control
-          .resetView({
-            position: "topleft",
-            title: "Reset view",
-            latlng: L.latLng(kestrelIntialLatLon),
-            zoom: 1,
-          })
-          .addTo(mapInstance);
-
-        var colors = [
-          "#ff4b00",
-          "#bac900",
-          "#EC1813",
-          "#55BCBE",
-          "#D2204C",
-          "#FF0000",
-          "#ada59a",
-          "#3e647e",
-        ];
-        var pi2 = Math.PI * 2;
-
+        // Add icon formatter for marker clusters (to donuts)
         L.Icon.MarkerCluster = L.Icon.extend({
           options: {
             iconSize: new L.Point(44, 44),
@@ -118,9 +195,9 @@ kismet_ui_tabpane.AddTab(
           },
           createIcon: function () {
             // based on L.Icon.Canvas from shramov/leaflet-plugins (BSD licence)
-            var e = document.createElement("canvas");
+            let e = document.createElement("canvas");
             this._setIconStyles(e, "icon");
-            var s = this.options.iconSize;
+            let s = this.options.iconSize;
             e.width = s.x;
             e.height = s.y;
             this.draw(e.getContext("2d"), s.x, s.y);
@@ -130,14 +207,14 @@ kismet_ui_tabpane.AddTab(
             return null;
           },
           draw: function (canvas, width, height) {
-            var start = 0;
-            for (var i = 0, l = colors.length; i < l; ++i) {
-              var size = this.stats[i] / this.population;
+            let start = 0;
+            for (let i = 0, l = colors.length; i < l; ++i) {
+              let size = this.stats[i] / this.population;
               if (size > 0) {
                 canvas.beginPath();
                 canvas.moveTo(22, 22);
                 canvas.fillStyle = colors[i];
-                var from = start + 0.14,
+                let from = start + 0.14,
                   to = start + size * pi2;
                 if (to < from) {
                   from = start;
@@ -151,7 +228,7 @@ kismet_ui_tabpane.AddTab(
             }
             canvas.beginPath();
             canvas.fillStyle = "white";
-            canvas.arc(22, 22, 18, 0, Math.PI * 2);
+            canvas.arc(22, 22, 18, 0, pi2);
             canvas.fill();
             canvas.closePath();
             canvas.fillStyle = "#555";
@@ -161,7 +238,127 @@ kismet_ui_tabpane.AddTab(
             canvas.fillText(this.population, 22, 22, 40);
           },
         });
-        var macs = [];
+
+        // Instantiate map
+        mapInstance = L.map("kestrel").setView(kestrelInitialLatLon, 1);
+        mapTileLayer = L.tileLayer(
+          "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            maxZoom: 19,
+            attribution:
+              '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          }
+        ).addTo(mapInstance);
+
+        // Event called when Leaflet thinks all visible tiles are loaded
+        // Invalidating the size ensures half-visible tiles (grayed areas) are loaded
+        mapTileLayer.on("load", function () {
+          mapInstance.invalidateSize();
+        });
+
+        // Attempt to refresh tiles when Kismet's layout is resized
+        $("#centerpane-tabs").on("resize", function () {
+          mapInstance.invalidateSize();
+        });
+
+        // Additional options on leaflet.mouseCoordinate's GitHub
+        // Ref: https://github.com/wattnpapa/leaflet.mouseCoordinate
+        L.control
+          .mouseCoordinate({ gps: true, gpsLong: false })
+          .addTo(mapInstance);
+
+        // Instantiate cluster for le clustering of devices
+        let clusterLayer = new PruneClusterForLeaflet();
+        mapInstance.addLayer(clusterLayer);
+
+        // Override cluster icon builder
+        clusterLayer.BuildLeafletClusterIcon = function (cluster) {
+          let e = new L.Icon.MarkerCluster();
+          e.stats = cluster.stats;
+          e.population = cluster.population;
+          return e;
+        };
+
+        // Fetch initial devices based on timeframe set
+        let last_heard = kestrel_initial_timeframe;
+
+        function refreshDevices() {
+          // Skip if not active tab
+          if (!isActiveTab) return;
+
+          let url =
+            local_uri_prefix +
+            "/devices/views/all/last-time/" +
+            last_heard +
+            "/devices.json";
+
+          $.ajax({
+            type: "POST",
+            async: false,
+            url: url,
+            data: postKismetFields,
+            success: plotDevices,
+            dataType: "json",
+          });
+        }
+
+        function plotDevices(response) {
+          let devices = kismet.sanitizeObject(response);
+
+          // clusterLayer.RemoveMarkers();
+
+          for (const d of devices) {
+            if (markers.has(d["kismet.device.base.key"])) {
+              markers
+                .get(d["kismet.device.base.key"])
+                .Move(d["location"][1], d["location"][0]);
+            } else {
+              let marker = createDeviceMarker(d);
+
+              marker.data.popup = `MAC: ${d["kismet.device.base.macaddr"]}<br>
+              SSID: ${d["kismet.device.base.name"]}<br>
+              Type: ${d["kismet.device.base.type"]}<br>
+              RSSI: ${d["last_signal"]}<br>
+              Coords: ${d["location"][1]}, ${d["location"][0]}<br>
+              <br>
+              <button type="button" class="kestrelDetailsBtn" value="${d["kismet.device.base.key"]}">Device Details</a>`;
+
+              markers.set(d["kismet.device.base.key"], marker);
+              clusterLayer.RegisterMarker(marker);
+            }
+
+            // Update last device heard timestamp for next call
+            if (d["kismet.device.base.last_time"] > last_heard) {
+              last_heard = d["kismet.device.base.last_time"];
+            }
+          }
+
+          // clusterLayer.RegisterMarkers(markers.values());
+          clusterLayer.ProcessView();
+
+          $(".kestrelDetailsBtn").on("click", function () {
+            kismet_ui.DeviceDetailWindow($(this).val());
+          });
+        }
+
+        // Run when the map gets initialized and at least one layer,
+        // or immediately if it's already initialized.
+        mapInstance.whenReady(function () {
+          refreshDevices();
+
+          clusterLayer.FitBounds();
+
+          L.control
+            .resetView({
+              position: "topleft",
+              title: "Reset view",
+              latlng: mapInstance.getCenter(),
+              zoom: mapInstance.getZoom(),
+            })
+            .addTo(mapInstance);
+
+          setInterval(refreshDevices, kestrelRefreshInterval);
+        });
 
         // Create empty polyline, locations will be added/plotted as GPS updates
         // var drivePath = L.polyline([], {
@@ -177,22 +374,6 @@ kismet_ui_tabpane.AddTab(
         // Create vehicle marker, stage at 0,0 until GPS updates
         // var driveMarker = L.marker([0, 0]);
         // driveMarker.addTo(mapInstance);
-
-        // Event called when Leaflet thinks all visible tiles are loaded
-        // Invalidating the size ensures half-visible tiles (grayed areas) are loaded
-        mapTileLayer.on("load", function () {
-          mapInstance.invalidateSize();
-        });
-
-        $("#centerpane-tabs").on("resize", function () {
-          mapInstance.invalidateSize();
-        });
-
-        // Retrieve all devices once
-        getOldDevs();
-
-        // Schedule periodic updates
-        setInterval(addDevs, kestrelRefreshInterval);
 
         // Update drive path (once)
         // updateDrivePath();
@@ -228,255 +409,21 @@ kismet_ui_tabpane.AddTab(
         //     }
         //   });
         // }
-
-        function getOldDevs() {
-          $.ajax({
-            url: "/devices/last-time/1/devices.json",
-            dataType: "json",
-            timeout: 30000,
-            success: function (devs) {
-              if (!Array.isArray(devs)) {
-                return;
-              }
-
-              var ssid = "";
-              var type = "";
-              var mac = "";
-              var rssi = "";
-              var manuf = "";
-              var lat = "";
-              var lon = "";
-              var min_lat = 0.0;
-              var min_lon = 0.0;
-              var max_lat = 0.0;
-              var max_lon = 0.0;
-              for (var x = 0; x < devs.length; x++) {
-                ssid = devs[x]["kismet.device.base.name"];
-                type = devs[x]["kismet.device.base.type"];
-                mac = devs[x]["kismet.device.base.macaddr"];
-                if ("kismet.device.base.signal" in devs[x]) {
-                  rssi =
-                    devs[x]["kismet.device.base.signal"][
-                      "kismet.common.signal.last_signal"
-                    ]; //Last signal dBm
-                } else {
-                  rssi = 0;
-                }
-                manuf = devs[x]["kismet.device.base.manuf"];
-                if ("kismet.device.base.location" in devs[x]) {
-                  lat =
-                    devs[x]["kismet.device.base.location"][
-                      "kismet.common.location.avg_loc"
-                    ]["kismet.common.location.geopoint"][1];
-                  lon =
-                    devs[x]["kismet.device.base.location"][
-                      "kismet.common.location.avg_loc"
-                    ]["kismet.common.location.geopoint"][0];
-                  if (lat < min_lat) min_lat = lat;
-                  if (lon < min_lon) min_lon = lon;
-                  if (lat > max_lat) max_lat = lat;
-                  if (lon > max_lon) max_lon = lon;
-                } else {
-                  lat = 0.0;
-                  lon = 0.0;
-                }
-                var device = {
-                  SSID: ssid,
-                  TYPE: type,
-                  MAC: mac,
-                  RSSI: rssi,
-                  LAT: lat,
-                  LON: lon,
-                  MANUF: manuf,
-                };
-                macs.push(device);
-              } // end of for
-
-              mapInstance.fitBounds([
-                [min_lat, min_lon],
-                [max_lat, max_lon],
-              ]);
-            }, //end of success
-          }); // end of ajax
-        } //end of getdevs
-
-        function addDevs() {
-          getDevs();
-          var uniqmacs = _.uniq(macs, "MAC");
-          dataCluster.RemoveMarkers();
-          // var search = document.getElementById("device_search").value;
-          var search = "";
-          for (var i in uniqmacs) {
-            var marker = new PruneCluster.Marker(
-              uniqmacs[i]["LAT"],
-              uniqmacs[i]["LON"]
-            );
-            marker.data.id = uniqmacs[i]["MAC"];
-            marker.filtered = false;
-            if (uniqmacs[i]["TYPE"] == "Wi-Fi AP") {
-              marker.data.icon = L.icon({
-                iconUrl: "/plugin/kestrel/images/ic_router_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 1;
-              marker.weight = 1;
-            } else if (uniqmacs[i]["TYPE"] == "Wi-Fi Client") {
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_laptop_chromebook_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 2;
-              marker.weight = 1;
-            } else if (uniqmacs[i]["TYPE"] == "Wi-Fi Bridged") {
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_power_input_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 3;
-              marker.weight = 1;
-            } else if (uniqmacs[i]["TYPE"] == "Wi-Fi WDS") {
-              marker.data.icon = L.icon({
-                iconUrl: "/plugin/kestrel/images/ic_leak_add_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 3;
-              marker.weight = 1;
-            } else if (uniqmacs[i]["TYPE"] == "Wi-Fi Ad-Hoc") {
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_cast_connected_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 3;
-              marker.weight = 1;
-            } else if (uniqmacs[i]["TYPE"] == "Wi-Fi Device") {
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 3;
-              marker.weight = 1;
-            } else if (uniqmacs[i]["TYPE"] == "") {
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 3;
-              marker.weight = 1;
-            } else if (uniqmacs[i]["TYPE"] == "Wi-Fi Client") {
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_laptop_chromebook_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 3;
-              marker.weight = 1;
-            } else {
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_bluetooth_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 5;
-              marker.weight = 1;
-            }
-            marker.data.popup =
-              "SSID: " +
-              uniqmacs[i]["SSID"] +
-              "<br>MAC: " +
-              uniqmacs[i]["MAC"] +
-              "<br>Manufacturer: " +
-              uniqmacs[i]["MANUF"] +
-              "<br>Type: " +
-              uniqmacs[i]["TYPE"];
-            if (uniqmacs[i]["SSID"].includes(search)) {
-              dataCluster.RegisterMarker(marker);
-            } else if (uniqmacs[i]["MAC"].includes(search)) {
-              dataCluster.RegisterMarker(marker);
-            } else if (uniqmacs[i]["TYPE"].includes(search)) {
-              dataCluster.RegisterMarker(marker);
-            }
-          }
-          dataCluster.ProcessView();
-          var latlon = _.last(uniqmacs);
-          mapInstance.addLayer(dataCluster); // Temporarily disabled locking-to-location until I figure a way to make it toggle-able. you can re-enable by adding .setView([latlon['LAT'],latlon['LON']], 16) to the end of this line
-          macs = uniqmacs;
-          //$.cookie("storedmacs", JSON.stringify(macs));
-        }
-
-        //Main routine, this gets devices and plots them
-        function getDevs() {
-          let ts = Math.floor(Date.now() / 1000) - 20000;
-
-          $.ajax({
-            url: "/devices/last-time/" + ts + "/devices.json",
-            dataType: "json",
-            timeout: 30000,
-            success: function (devs) {
-              var ssid = "";
-              var type = "";
-              var mac = "";
-              var manuf = "";
-              var rssi = "";
-              var lat = "";
-              var lon = "";
-              for (var x = 0; x < devs.length; x++) {
-                ssid = devs[x]["kismet.device.base.name"];
-                type = devs[x]["kismet.device.base.type"];
-                mac = devs[x]["kismet.device.base.macaddr"];
-                manuf = devs[x]["kismet.device.base.manuf"];
-                if ("kismet.device.base.signal" in devs[x]) {
-                  rssi =
-                    devs[x]["kismet.device.base.signal"][
-                      "kismet.common.signal.last_signal"
-                    ]; //Last signal dBm
-                } else {
-                  rssi = 0;
-                }
-                if ("kismet.device.base.location" in devs[x]) {
-                  lat =
-                    devs[x]["kismet.device.base.location"][
-                      "kismet.common.location.avg_loc"
-                    ]["kismet.common.location.geopoint"][1];
-                  lon =
-                    devs[x]["kismet.device.base.location"][
-                      "kismet.common.location.avg_loc"
-                    ]["kismet.common.location.geopoint"][0];
-                } else {
-                  lat = 0.0;
-                  lon = 0.0;
-                }
-                var device = {
-                  SSID: ssid,
-                  TYPE: type,
-                  MAC: mac,
-                  RSSI: rssi,
-                  LAT: lat,
-                  LON: lon,
-                  MANUF: manuf,
-                };
-                macs.push(device);
-              } // end of for
-            },
-            fail: function (res) {
-              console.log("getDevs failed! ", res);
-            },
-          }); // end of ajax
-        } //end of getdevs
       }); //end of document.ready
-    }, //end of createCallback
+    },
     activateCallback: function () {
+      isActiveTab = true;
+
       $(document).ready(function () {
         mapInstance.invalidateSize();
       });
     },
+    deactivateCallback: function () {
+      isActiveTab = false;
+    },
   },
-  "center"
-); //End of createCallback
+  "center" // Add tab to center pane of layout
+);
 
 kismet_ui_settings.AddSettingsPane({
   id: "kestrel_settings",
@@ -558,4 +505,4 @@ kismet_ui_settings.AddSettingsPane({
 
     return true;
   },
-}); // end AddSettingsPane
+});
