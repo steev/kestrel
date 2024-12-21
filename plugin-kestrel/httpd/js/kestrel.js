@@ -14,14 +14,14 @@ const INITIAL_LATLON = [0.0, 0.0];
 // Colors used for the cluster donuts
 // @todo Add color settings
 const COLORS = [
-  "#ff4b00",
-  "#bac900",
-  "#EC1813",
-  "#55BCBE",
-  "#D2204C",
-  "#FF0000",
-  "#ada59a",
-  "#3e647e",
+  "#0057e5",
+  "#1982c4",
+  "#ed008c",
+  "#05fb00",
+  "#fff500",
+  "#ff6100",
+  "#e90000",
+  "#a538c6",
 ];
 
 // Simple way to do the math once
