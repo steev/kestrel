@@ -274,7 +274,8 @@ kismet_ui_tabpane.AddTab(
           .addTo(mapInstance);
 
         // Instantiate cluster for le clustering of devices
-        let clusterLayer = new PruneClusterForLeaflet();
+        // @todo Add controls to change size and margin dynamically
+        let clusterLayer = new PruneClusterForLeaflet(80, 5);
         mapInstance.addLayer(clusterLayer);
 
         // Override cluster icon builder
