@@ -113,6 +113,16 @@ kismet_ui_tabpane.AddTab(
             d["location"][0]
           );
 
+          marker.data.popup = `<table>
+          <tr><th>MAC</th><td>${d["kismet.device.base.macaddr"]}</td></tr>
+          <tr><th>SSID</th><td>${d["kismet.device.base.name"]}</td></tr>
+          <tr><th>Type</th><td>${d["kismet.device.base.type"]}</td></tr>
+          <tr><th>Manuf</th><td>${d["kismet.device.base.manuf"]}</td></tr>
+          <tr><th>RSSI</th><td>${d["last_signal"]}</td></tr>
+          <tr><th>Coords</th><td>${d["location"][1]}, ${d["location"][0]}</td></tr>
+          </table>
+          <button type="button" class="kestrelDetailsBtn" value="${d["kismet.device.base.key"]}">Device Details</a>`;
+
           switch (d["kismet.device.base.type"]) {
             case "Wi-Fi AP":
               marker.data.icon = L.icon({
@@ -318,17 +328,6 @@ kismet_ui_tabpane.AddTab(
                 .Move(d["location"][1], d["location"][0]);
             } else {
               let marker = createDeviceMarker(d);
-
-              marker.data.popup = `<table>
-              <tr><th>MAC</th><td>${d["kismet.device.base.macaddr"]}</td></tr>
-              <tr><th>SSID</th><td>${d["kismet.device.base.name"]}</td></tr>
-              <tr><th>Type</th><td>${d["kismet.device.base.type"]}</td></tr>
-              <tr><th>Manuf</th><td>${d["kismet.device.base.manuf"]}</td></tr>
-              <tr><th>RSSI</th><td>${d["last_signal"]}</td></tr>
-              <tr><th>Coords</th><td>${d["location"][1]}, ${d["location"][0]}</td></tr>
-              </table>
-              <button type="button" class="kestrelDetailsBtn" value="${d["kismet.device.base.key"]}">Device Details</a>`;
-
               markers.set(d["kismet.device.base.key"], marker);
               clusterLayer.RegisterMarker(marker);
             }
