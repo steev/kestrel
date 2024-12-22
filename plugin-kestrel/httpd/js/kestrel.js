@@ -11,22 +11,6 @@ const REFRESH_INTERVAL = 1000;
 // Default: [0.0, 0.0]
 const INITIAL_LATLON = [0.0, 0.0];
 
-// Colors used for the cluster donuts
-// @todo Add color settings
-const COLORS = [
-  "#0057e5",
-  "#1982c4",
-  "#ed008c",
-  "#05fb00",
-  "#fff500",
-  "#ff6100",
-  "#e90000",
-  "#a538c6",
-];
-
-// Simple way to do the math once
-const PI2 = Math.PI * 2;
-
 const KISMET_FIELDS = {
   fields: [
     "kismet.device.base.key",
@@ -63,10 +47,11 @@ let kestrelInitialLatLon = kismet.getStorage(
 
 let kestrel_initial_timeframe = 1;
 
-let markers = new Map();
+let mapMarkers = new Map();
 let mapInstance;
 let mapTileLayer;
 let isActiveTab = false;
+let refreshTimer;
 
 kismet_ui_tabpane.AddTab(
   {
@@ -79,7 +64,13 @@ kismet_ui_tabpane.AddTab(
           '<link rel="stylesheet" href="/plugin/kestrel/css/leaflet.css">'
         );
         $(div).append(
-          '<link rel="stylesheet" href="/plugin/kestrel/css/kestrel.css">'
+          '<link rel="stylesheet" href="/plugin/kestrel/css/MarkerCluster.css">'
+        );
+        $(div).append(
+          '<link rel="stylesheet" href="/plugin/kestrel/css/MarkerCluster.Default.css">'
+        );
+        $(div).append(
+          '<link rel="stylesheet" href="/plugin/kestrel/css/Leaflet.DonutCluster.css">'
         );
         $(div).append(
           '<link rel="stylesheet" href="/plugin/kestrel/css/leaflet.mousecoordinate.css">'
@@ -90,9 +81,6 @@ kismet_ui_tabpane.AddTab(
         $(div).append(
           '<script src="/plugin/kestrel/js/underscore-min.js"></script>'
         );
-        $(div).append(
-          '<script src="/plugin/kestrel/js/PruneCluster.js"></script>'
-        );
         // Uncomment additional formats to use with leaflet.mouseCoordinate
         // Ref: https://github.com/wattnpapa/leaflet.mouseCoordinate
         // $(div).append('<script src="/plugin/kestrel/js/nac.js"></script>');
@@ -101,159 +89,57 @@ kismet_ui_tabpane.AddTab(
         // $(div).append('<script src="/plugin/kestrel/js/utmref.js"></script>');
         $(div).append('<script src="/plugin/kestrel/js/leaflet.js"></script>');
         $(div).append(
+          '<script src="/plugin/kestrel/js/leaflet.markercluster.js"></script>'
+        );
+        $(div).append(
+          '<script src="/plugin/kestrel/js/Leaflet.DonutCluster.js"></script>'
+        );
+        $(div).append(
           '<script src="/plugin/kestrel/js/leaflet.mousecoordinate.min.js">'
         );
         $(div).append(
           '<script src="/plugin/kestrel/js/L.Control.ResetView.min.js"></script>'
         );
 
-        function createDeviceMarker(d) {
-          let marker = new PruneCluster.Marker(
-            d["location"][1],
-            d["location"][0]
-          );
+        function getDeviceMarkerIcon(deviceType) {
+          let iconUrl = "/plugin/kestrel/images/ic_bluetooth_black_24dp_1x.png";
 
-          marker.data.popup = `<table>
-          <tr><th>MAC</th><td>${d["kismet.device.base.macaddr"]}</td></tr>
-          <tr><th>SSID</th><td>${d["kismet.device.base.name"]}</td></tr>
-          <tr><th>Type</th><td>${d["kismet.device.base.type"]}</td></tr>
-          <tr><th>Manuf</th><td>${d["kismet.device.base.manuf"]}</td></tr>
-          <tr><th>RSSI</th><td>${d["last_signal"]}</td></tr>
-          <tr><th>Coords</th><td>${d["location"][1]}, ${d["location"][0]}</td></tr>
-          </table>
-          <button type="button" class="kestrelDetailsBtn" value="${d["kismet.device.base.key"]}">Device Details</a>`;
-
-          switch (d["kismet.device.base.type"]) {
+          switch (deviceType) {
             case "Wi-Fi AP":
-              marker.data.icon = L.icon({
-                iconUrl: "/plugin/kestrel/images/ic_router_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 1;
-              marker.weight = 1;
+              iconUrl = "/plugin/kestrel/images/ic_router_black_24dp_1x.png";
               break;
             case "Wi-Fi Client":
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_laptop_chromebook_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 2;
-              marker.weight = 1;
+              iconUrl =
+                "/plugin/kestrel/images/ic_laptop_chromebook_black_24dp_1x.png";
               break;
             case "Wi-Fi Bridged":
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_power_input_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 3;
-              marker.weight = 1;
+              iconUrl =
+                "/plugin/kestrel/images/ic_power_input_black_24dp_1x.png";
               break;
             case "Wi-Fi WDS":
-              marker.data.icon = L.icon({
-                iconUrl: "/plugin/kestrel/images/ic_leak_add_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 4;
-              marker.weight = 1;
+              iconUrl = "/plugin/kestrel/images/ic_leak_add_black_24dp_1x.png";
               break;
             case "Wi-Fi Ad-Hoc":
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_cast_connected_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 5;
-              marker.weight = 1;
+              iconUrl =
+                "/plugin/kestrel/images/ic_cast_connected_black_24dp_1x.png";
               break;
             case "Wi-Fi Device":
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 6;
-              marker.weight = 1;
+              iconUrl =
+                "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png";
               break;
             case "":
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 7;
-              marker.weight = 1;
+              iconUrl =
+                "/plugin/kestrel/images/ic_network_check_black_24dp_1x.png";
               break;
             default:
-              marker.data.icon = L.icon({
-                iconUrl:
-                  "/plugin/kestrel/images/ic_bluetooth_black_24dp_1x.png",
-                iconSize: [24, 24],
-              });
-              marker.category = 8;
-              marker.weight = 1;
               break;
           }
 
-          return marker;
+          return L.icon({
+            iconUrl: iconUrl,
+            iconSize: [24, 24],
+          });
         }
-
-        // Add icon formatter for marker clusters (to donuts)
-        L.Icon.MarkerCluster = L.Icon.extend({
-          options: {
-            iconSize: new L.Point(44, 44),
-            className: "prunecluster leaflet-markercluster-icon",
-          },
-          createIcon: function () {
-            // based on L.Icon.Canvas from shramov/leaflet-plugins (BSD licence)
-            let e = document.createElement("canvas");
-            this._setIconStyles(e, "icon");
-            let s = this.options.iconSize;
-            e.width = s.x;
-            e.height = s.y;
-            this.draw(e.getContext("2d"), s.x, s.y);
-            return e;
-          },
-          createShadow: function () {
-            return null;
-          },
-          draw: function (canvas, width, height) {
-            // Pie slices
-            let start = 0;
-            console.log(this.stats);
-            for (let i = 0; i < COLORS.length; ++i) {
-              let size = this.stats[i] / this.population;
-              if (size > 0) {
-                canvas.beginPath();
-                canvas.moveTo(22, 22);
-                canvas.fillStyle = COLORS[i];
-                let from = start + 0.14; // Add empty space between slices
-                let to = start + size * PI2;
-                if (to < from) {
-                  from = start;
-                }
-                canvas.arc(22, 22, 22, from, to);
-                start = start + size * PI2;
-                canvas.lineTo(22, 22);
-                canvas.fill();
-                canvas.closePath();
-              }
-            }
-            // Donut hole background
-            canvas.beginPath();
-            canvas.fillStyle = "white";
-            canvas.arc(22, 22, 18, 0, PI2);
-            canvas.fill();
-            canvas.closePath();
-            // Donut hole text (count)
-            canvas.fillStyle = "#555";
-            canvas.textAlign = "center";
-            canvas.textBaseline = "middle";
-            canvas.font = "bold 12px sans-serif";
-            canvas.fillText(this.population, 22, 22, 40);
-          },
-        });
 
         // Instantiate map
         mapInstance = L.map("kestrel").setView(kestrelInitialLatLon, 1);
@@ -283,18 +169,37 @@ kismet_ui_tabpane.AddTab(
           .mouseCoordinate({ gps: true, gpsLong: false })
           .addTo(mapInstance);
 
-        // Instantiate cluster for le clustering of devices
-        // @todo Add controls to change size and margin dynamically
-        let clusterLayer = new PruneClusterForLeaflet(80, 5);
-        mapInstance.addLayer(clusterLayer);
+        // Create the markercluster
+        let donutLayer = L.DonutCluster(
+          // The first parameter is the standard marker cluster's configuration.
+          {
+            chunkedLoading: true,
+          },
+          // The second parameter is the donut cluster's configuration.
+          {
+            // Mandatory, indicates the field to group items by in order to create donut' sections.
+            key: "type",
+            // Mandatory, the arc color for each donut section.
+            // If array of colors will loop over it to pick color of each section sequentially.
+            arcColorDict: [
+              "red",
+              "blue",
+              "yellow",
+              "black",
+              "orange",
+              "purple",
+              "fuschia",
+            ],
+            // Set this to true to avoid displaying legend on mouse over
+            hideLegend: false,
+          }
+        );
+        mapInstance.addLayer(donutLayer);
 
-        // Override cluster icon builder
-        clusterLayer.BuildLeafletClusterIcon = function (cluster) {
-          let e = new L.Icon.MarkerCluster();
-          e.stats = cluster.stats;
-          e.population = cluster.population;
-          return e;
-        };
+        // Prevent spiderfied markers to close on updates by stopping refresh temporarily
+        // @todo on mouse hover of marker, show tooltip of basic information (mac/type/ssid)
+        donutLayer.on("spiderfied", stopRefresh);
+        donutLayer.on("unspiderfied", startRefresh);
 
         // Fetch initial devices based on timeframe set
         let last_heard = kestrel_initial_timeframe;
@@ -321,15 +226,29 @@ kismet_ui_tabpane.AddTab(
         function plotDevices(response) {
           let devices = kismet.sanitizeObject(response);
 
+          let location;
           for (const d of devices) {
-            if (markers.has(d["kismet.device.base.key"])) {
-              markers
-                .get(d["kismet.device.base.key"])
-                .Move(d["location"][1], d["location"][0]);
+            // @todo use last known good coords?
+            // @todo from this device or any device? customize through settings?
+            if (d["location"] === 0) {
+              location = L.latLng(0.0, 0.0);
             } else {
-              let marker = createDeviceMarker(d);
-              markers.set(d["kismet.device.base.key"], marker);
-              clusterLayer.RegisterMarker(marker);
+              location = L.latLng(d["location"][1], d["location"][0]);
+            }
+
+            if (mapMarkers.has(d["kismet.device.base.key"])) {
+              mapMarkers.get(d["kismet.device.base.key"]).setLatLng(location);
+            } else {
+              let marker = L.marker(location, {
+                base_key: d["kismet.device.base.key"],
+                type: d["kismet.device.base.type"], // the value to group
+                icon: getDeviceMarkerIcon(d["kismet.device.base.type"]),
+              });
+              marker.on("click", function () {
+                kismet_ui.DeviceDetailWindow(d["kismet.device.base.key"]);
+              });
+              mapMarkers.set(d["kismet.device.base.key"], marker);
+              donutLayer.addLayer(marker);
             }
 
             // Update last device heard timestamp for next call
@@ -337,20 +256,15 @@ kismet_ui_tabpane.AddTab(
               last_heard = d["kismet.device.base.last_time"];
             }
           }
-
-          clusterLayer.ProcessView();
-
-          $(".kestrelDetailsBtn").on("click", function () {
-            kismet_ui.DeviceDetailWindow($(this).val());
-          });
         }
 
         // Run when the map gets initialized and at least one layer,
         // or immediately if it's already initialized.
         mapInstance.whenReady(function () {
-          refreshDevices();
+          startRefresh();
 
-          clusterLayer.FitBounds();
+          // @todo replace with a fitBounds of loaded data? (event based? add a toggle button to leaflet?)
+          mapInstance.flyTo(kestrelInitialLatLon);
 
           // @todo Add a button to set a new reset location/zoom
           L.control
@@ -361,9 +275,16 @@ kismet_ui_tabpane.AddTab(
               zoom: mapInstance.getZoom(),
             })
             .addTo(mapInstance);
-
-          setInterval(refreshDevices, kestrelRefreshInterval);
         });
+
+        function startRefresh() {
+          refreshDevices();
+          refreshTimer = setInterval(refreshDevices, kestrelRefreshInterval);
+        }
+
+        function stopRefresh() {
+          clearTimeout(refreshTimer);
+        }
 
         // Create empty polyline, locations will be added/plotted as GPS updates
         // var drivePath = L.polyline([], {
